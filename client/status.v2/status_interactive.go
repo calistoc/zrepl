@@ -3,6 +3,7 @@ package status
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/zrepl/zrepl/client/status.v2/viewmodel"
 )
 
-func interactive(c Client) error {
+func interactive(c Client, flag statusFlags) error {
 
 	// TODO look into https://gitlab.com/tslocum/cview/blob/master/FORK.md
 
@@ -125,6 +126,15 @@ func interactive(c Client) error {
 	}
 	redraw = func() {
 		jobs := m.Jobs()
+		if flag.Job != "" {
+			for i := range jobs {
+				if strings.Compare(flag.Job, jobs[i].Name()) == 0 {
+					jobs = jobs[i : i+1]
+					break
+				}
+			}
+		}
+
 		redrawJobsList := false
 		var selectedJobN *tview.TreeNode
 		if len(jobMenuRoot.GetChildren()) == len(jobs) {
@@ -191,14 +201,15 @@ func interactive(c Client) error {
 				})
 			}
 		}()
-		t := time.NewTicker(300 * time.Millisecond)
-		for range t.C {
+		for {
 			st, err := c.Status()
 			viewmodelupdate(func(p *viewmodel.Params) {
 				p.Report = st.Jobs
 				p.ReportFetchError = err
 			})
 			app.QueueUpdateDraw(redraw)
+
+			time.Sleep(time.Duration(flag.Delay) * time.Second)
 		}
 	}()
 
